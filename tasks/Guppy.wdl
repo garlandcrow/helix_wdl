@@ -37,7 +37,7 @@ workflow Guppy {
     }
     
 
-    call Utils.Timestamp as TimestampStopped { input: dummy_dependencies = Basecall.sequencing_summary }
+    # call Utils.Timestamp as TimestampStopped { input: dummy_dependencies = Basecall.sequencing_summary }
     # call Utils.Sum as SumPassingFastqs { input: ints = Basecall.num_pass_fastqs }
     # call Utils.Sum as SumFailingFastqs { input: ints = Basecall.num_fail_fastqs }
 
@@ -47,17 +47,15 @@ workflow Guppy {
         input:
             instrument      = instrument,
             flow_cell_id    = flow_cell_id,
-            sample_id       = select_first([sample_name, Basecall.metadata[0]['sampleid']]),
-            protocol_run_id = select_first([protocol_run_id, Basecall.metadata[0]['runid']]),
-            started         = Basecall.metadata[0]['start_time']
-            # stopped         = TimestampStopped.timestamp
+            sample_id       = select_first([sample_name, "some_sample_id"]),
+            protocol_run_id = select_first([protocol_run_id, "some_run_id"])
     }
 
     call Utils.Uniq as UniqueBarcodes { input: strings = Basecall.barcodes }
 
     call FinalizeBasecalls {
         input:
-            pass_fastqs        = flatten(Basecall.pass_fastqs),
+            pass_fastqs        = Basecall.pass_fastqs,
             sequencing_summary = Basecall.sequencing_summary,
             final_summary      = MakeFinalSummary.final_summary,
             barcodes           = UniqueBarcodes.unique_strings,
@@ -255,8 +253,8 @@ task MakeFinalSummary {
         String sample_id
         String flow_cell_id
         String protocol_run_id
-        String started
-        # String stopped
+        String started = "fakeStart"
+        String stopped = "fakeStop"
 
         RuntimeAttr? runtime_attr_override
     }
@@ -271,8 +269,8 @@ task MakeFinalSummary {
         echo 'sample_id=~{sample_id}' >> final_summary.txt
         echo 'protocol_run_id=~{protocol_run_id}' >> final_summary.txt
         echo 'started=~{started}' >> final_summary.txt
-        # echo 'acquisition_stopped=~{stopped}' >> final_summary.txt
-        # echo 'processing_stopped=~{stopped}' >> final_summary.txt
+        echo 'acquisition_stopped=~{stopped}' >> final_summary.txt
+        echo 'processing_stopped=~{stopped}' >> final_summary.txt
         echo 'basecalling_enabled=1' >> final_summary.txt
         echo 'sequencing_summary_file=sequencing_summary.txt' >> final_summary.txt
     >>>
