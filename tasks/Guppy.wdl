@@ -9,9 +9,9 @@ version 1.0
 #   linearly but untested.
 ##########################################################################################
 
-import "Utils.wdl" as Utils
-import "ONTUtils.wdl" as ONT
-import "Structs.wdl"
+import "https://raw.githubusercontent.com/garlandcrow/helix_wdl/master/tasks/Utils.wdl" as Utils
+import "https://raw.githubusercontent.com/garlandcrow/helix_wdl/master/tasks/ONTUtils.wdl" as ONT
+import "https://raw.githubusercontent.com/garlandcrow/helix_wdl/master/tasks/Structs.wdl"
 
 workflow Guppy {
     input {

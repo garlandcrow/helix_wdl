@@ -1,6 +1,6 @@
 version 1.0
 
-import "tasks/Guppy.wdl" as Guppy
+import "https://raw.githubusercontent.com/garlandcrow/helix_wdl/master/tasks/Guppy.wdl" as Guppy
 
 workflow TupacBasecall {
     input {

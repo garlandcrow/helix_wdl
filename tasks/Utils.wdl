@@ -1,6 +1,6 @@
 version 1.0
 
-import "Structs.wdl"
+import "https://raw.githubusercontent.com/garlandcrow/helix_wdl/master/tasks/Structs.wdl"
 
 task GetDefaultDir {
     input {
