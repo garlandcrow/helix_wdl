@@ -158,19 +158,19 @@ task Basecall {
         find fail -name '*fastq.gz' | wc -l | tee num_fail.txt
 
         # Extract relevant metadata (e.g. sample id, run id, etc.) from the first fastq file
-        find pass -name '*fastq.gz' -type f | \
-            head -1 | \
-            xargs -n1 zgrep -m1 '^@' | \
-            sed 's/ /\n/g' | \
-            grep -v '^@' | \
-            sed 's/=/\t/g' | tee metadata.txt
+        # find pass -name '*fastq.gz' -type f | \
+        #     head -1 | \
+        #     xargs -n1 zgrep -m1 '^@' | \
+        #     sed 's/ /\n/g' | \
+        #     grep -v '^@' | \
+        #     sed 's/=/\t/g' | tee metadata.txt
     >>>
 
     output {
         Array[File] pass_fastqs = glob("pass/*.fastq.gz")
         File sequencing_summary = "guppy_output/sequencing_summary.txt"
         Array[String] barcodes = read_lines("barcodes.txt")
-        Map[String, String] metadata = read_map("metadata.txt")
+        # Map[String, String] metadata = read_map("metadata.txt")
         Int num_pass_fastqs = read_int("num_pass.txt")
         Int num_fail_fastqs = read_int("num_fail.txt")
     }
