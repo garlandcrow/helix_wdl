@@ -17,7 +17,6 @@ workflow Guppy {
     input {
         String gcs_fast5_dir
 
-        Int num_shards = 1
         String config
         String? barcode_kit
 
@@ -30,17 +29,13 @@ workflow Guppy {
     }
 
     call ListFast5s { input: gcs_fast5_dir = gcs_fast5_dir }
-    call ONT.PartitionManifest as PartitionFast5Manifest { input: manifest = ListFast5s.manifest, N = num_shards }
-
-    scatter (chunk_index in range(length(PartitionFast5Manifest.manifest_chunks))) {
-        call Basecall {
-            input:
-                fast5_files  = read_lines(PartitionFast5Manifest.manifest_chunks[chunk_index]),
-                config       = config,
-                barcode_kit  = barcode_kit,
-                index        = chunk_index
-        }
+    call Basecall {
+        input:
+            fast5_files  = ListFast5s.fast5_files
+            config       = config,
+            barcode_kit  = barcode_kit
     }
+    
 
     call Utils.Timestamp as TimestampStopped { input: dummy_dependencies = Basecall.sequencing_summary }
     call Utils.Sum as SumPassingFastqs { input: ints = Basecall.num_pass_fastqs }
@@ -92,7 +87,7 @@ task ListFast5s {
     >>>
 
     output {
-        File manifest = "fast5_files.txt"
+        Array[File] fast5_files = read_lines("fast5_files.txt")
     }
 
     #########################
