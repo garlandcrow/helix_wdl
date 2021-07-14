@@ -31,7 +31,7 @@ workflow Guppy {
     call ListFast5s { input: gcs_fast5_dir = gcs_fast5_dir }
     call Basecall {
         input:
-            fast5_files  = ListFast5s.fast5_files
+            fast5_files  = ListFast5s.fast5_files,
             config       = config,
             barcode_kit  = barcode_kit
     }
