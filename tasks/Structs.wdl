@@ -1,4 +1,4 @@
-version 1.0
+version development
 
 struct RuntimeAttr {
     Float? mem_gb

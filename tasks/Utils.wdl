@@ -1,4 +1,4 @@
-version 1.0
+version development
 
 import "https://raw.githubusercontent.com/garlandcrow/helix_wdl/master/tasks/Structs.wdl"
 
