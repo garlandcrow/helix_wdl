@@ -15,7 +15,7 @@ import "https://raw.githubusercontent.com/garlandcrow/helix_wdl/master/tasks/Str
 
 workflow Guppy {
     input {
-        String gcs_fast5_dir
+        Array [File] gcs_fast5_files
 
         String config
         String? barcode_kit
@@ -28,10 +28,11 @@ workflow Guppy {
         String gcs_out_root_dir
     }
 
-    call ListFast5s { input: gcs_fast5_dir = gcs_fast5_dir }
+    # call ListFast5s { input: gcs_fast5_files = gcs_fast5_files }
     call Basecall {
         input:
-            fast5_files  = ListFast5s.fast5_files,
+            # fast5_files  = ListFast5s.fast5_files,
+            fast5_files  = gcs_fast5_files,
             config       = config,
             barcode_kit  = barcode_kit
     }
@@ -65,51 +66,51 @@ workflow Guppy {
     output {
         String gcs_dir = FinalizeBasecalls.gcs_dir
         Array[String] barcodes = UniqueBarcodes.unique_strings
-        Int num_fast5s = ListFast5s.fast5_count
+        # Int num_fast5s = ListFast5s.fast5_count
         Int num_pass_fastqs = Basecall.num_pass_fastqs
         Int num_fail_fastqs = Basecall.num_fail_fastqs
     }
 }
 
-task ListFast5s {
-    input {
-        String gcs_fast5_dir
+# task ListFast5s {
+#     input {
+#         Array [String] gcs_fast5_files
 
-        RuntimeAttr? runtime_attr_override
-    }
+#         RuntimeAttr? runtime_attr_override
+#     }
 
-    String indir = sub(gcs_fast5_dir, "/$", "")
+#     String indir = sub(gcs_fast5_dir, "/$", "")
 
-    command <<<
-        gsutil ls "~{indir}/*/**.fast5" > fast5_files.txt
-    >>>
+#     command <<<
+#          "~{indir}/*/**.fast5" > fast5_files.txt
+#     >>>
 
-    output {
-        Array[File] fast5_files = read_lines("fast5_files.txt")
-        Int fast5_count = length(read_lines("fast5_files.txt"))
-    }
+#     output {
+#         Array[File] fast5_files = read_lines("fast5_files.txt")
+#         Int fast5_count = length(read_lines("fast5_files.txt"))
+#     }
 
-    #########################
-    RuntimeAttr default_attr = object {
-        cpu_cores:          1,
-        mem_gb:             1,
-        disk_gb:            1,
-        boot_disk_gb:       10,
-        preemptible_tries:  0,
-        max_retries:        0,
-        docker:             "us.gcr.io/broad-dsp-lrma/lr-utils:0.1.8"
-    }
-    RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
-    runtime {
-        cpu:                    select_first([runtime_attr.cpu_cores,         default_attr.cpu_cores])
-        memory:                 select_first([runtime_attr.mem_gb,            default_attr.mem_gb]) + " GiB"
-        disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + " HDD"
-        bootDiskSizeGb:         select_first([runtime_attr.boot_disk_gb,      default_attr.boot_disk_gb])
-        preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
-        maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
-        docker:                 select_first([runtime_attr.docker,            default_attr.docker])
-    }
-}
+#     #########################
+#     RuntimeAttr default_attr = object {
+#         cpu_cores:          1,
+#         mem_gb:             1,
+#         disk_gb:            1,
+#         boot_disk_gb:       10,
+#         preemptible_tries:  0,
+#         max_retries:        0,
+#         docker:             "us.gcr.io/broad-dsp-lrma/lr-utils:0.1.8"
+#     }
+#     RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
+#     runtime {
+#         cpu:                    select_first([runtime_attr.cpu_cores,         default_attr.cpu_cores])
+#         memory:                 select_first([runtime_attr.mem_gb,            default_attr.mem_gb]) + " GiB"
+#         disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + " HDD"
+#         bootDiskSizeGb:         select_first([runtime_attr.boot_disk_gb,      default_attr.boot_disk_gb])
+#         preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
+#         maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
+#         docker:                 select_first([runtime_attr.docker,            default_attr.docker])
+#     }
+# }
 
 task Basecall {
     input {
