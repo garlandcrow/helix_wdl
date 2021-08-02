@@ -1,4 +1,4 @@
-version development
+version Development
 
 ##########################################################################################
 # A workflow that runs the Guppy basecaller on ONT FAST5 files.
