@@ -197,7 +197,7 @@ task FinalizeBasecalls {
     input {
         Array[String] pass_fastqs
         File sequencing_summary
-        File final_summary
+        # File final_summary
         Array[String] barcodes
 
         String outdir
@@ -220,14 +220,14 @@ task FinalizeBasecalls {
 
             if [ ~{length(barcodes)} -eq 1 ]; then
                 cp ~{sequencing_summary} sequencing_summary.$b.txt
-                cp ~{final_summary} final_summary.$b.txt
+                # cp ~{final_summary} final_summary.$b.txt
             else
                 grep -w -e filename -e $b ~{sequencing_summary} > sequencing_summary.$b.txt
-                sed "s/sample_id=/sample_id=$b./" ~{final_summary} > final_summary.$b.txt
+                # sed "s/sample_id=/sample_id=$b./" ~{final_summary} > final_summary.$b.txt
             fi
 
             gsutil cp sequencing_summary.$b.txt $OUT_DIR/
-            gsutil cp final_summary.$b.txt $OUT_DIR/
+            # gsutil cp final_summary.$b.txt $OUT_DIR/
         done <~{write_lines(barcodes)}
     >>>
 
