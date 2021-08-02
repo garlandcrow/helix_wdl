@@ -1,4 +1,4 @@
-version 1.0
+version development
 
 ##########################################################################################
 # A workflow that runs the Guppy basecaller on ONT FAST5 files.
@@ -28,28 +28,11 @@ workflow Guppy {
         String gcs_out_root_dir
     }
 
-    # call ListFast5s { input: gcs_fast5_files = gcs_fast5_files }
     call Basecall {
         input:
-            # fast5_files  = ListFast5s.fast5_files,
             fast5_files  = gcs_fast5_files,
             config       = config,
             barcode_kit  = barcode_kit
-    }
-    
-
-    # call Utils.Timestamp as TimestampStopped { input: dummy_dependencies = Basecall.sequencing_summary }
-    # call Utils.Sum as SumPassingFastqs { input: ints = Basecall.num_pass_fastqs }
-    # call Utils.Sum as SumFailingFastqs { input: ints = Basecall.num_fail_fastqs }
-
-    # call MakeSequencingSummary { input: sequencing_summaries = Basecall.sequencing_summary }
-
-    call MakeFinalSummary {
-        input:
-            instrument      = instrument,
-            flow_cell_id    = flow_cell_id,
-            sample_id       = select_first([sample_name, "some_sample_id"]),
-            protocol_run_id = select_first([protocol_run_id, "some_run_id"])
     }
 
     call Utils.Uniq as UniqueBarcodes { input: strings = Basecall.barcodes }
@@ -58,7 +41,6 @@ workflow Guppy {
         input:
             pass_fastqs        = Basecall.pass_fastqs,
             sequencing_summary = Basecall.sequencing_summary,
-            final_summary      = MakeFinalSummary.final_summary,
             barcodes           = UniqueBarcodes.unique_strings,
             outdir             = gcs_out_root_dir
     }
@@ -66,58 +48,16 @@ workflow Guppy {
     output {
         String gcs_dir = FinalizeBasecalls.gcs_dir
         Array[String] barcodes = UniqueBarcodes.unique_strings
-        # Int num_fast5s = ListFast5s.fast5_count
         Int num_pass_fastqs = Basecall.num_pass_fastqs
         Int num_fail_fastqs = Basecall.num_fail_fastqs
     }
 }
-
-# task ListFast5s {
-#     input {
-#         Array [String] gcs_fast5_files
-
-#         RuntimeAttr? runtime_attr_override
-#     }
-
-#     String indir = sub(gcs_fast5_dir, "/$", "")
-
-#     command <<<
-#          "~{indir}/*/**.fast5" > fast5_files.txt
-#     >>>
-
-#     output {
-#         Array[File] fast5_files = read_lines("fast5_files.txt")
-#         Int fast5_count = length(read_lines("fast5_files.txt"))
-#     }
-
-#     #########################
-#     RuntimeAttr default_attr = object {
-#         cpu_cores:          1,
-#         mem_gb:             1,
-#         disk_gb:            1,
-#         boot_disk_gb:       10,
-#         preemptible_tries:  0,
-#         max_retries:        0,
-#         docker:             "us.gcr.io/broad-dsp-lrma/lr-utils:0.1.8"
-#     }
-#     RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
-#     runtime {
-#         cpu:                    select_first([runtime_attr.cpu_cores,         default_attr.cpu_cores])
-#         memory:                 select_first([runtime_attr.mem_gb,            default_attr.mem_gb]) + " GiB"
-#         disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + " HDD"
-#         bootDiskSizeGb:         select_first([runtime_attr.boot_disk_gb,      default_attr.boot_disk_gb])
-#         preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
-#         maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
-#         docker:                 select_first([runtime_attr.docker,            default_attr.docker])
-#     }
-# }
 
 task Basecall {
     input {
         Array[File] fast5_files
         String config = "dna_r9.4.1_450bps_hac_prom.cfg"
         String? barcode_kit
-        Int index = 0
 
         RuntimeAttr? runtime_attr_override
     }
@@ -128,6 +68,8 @@ task Basecall {
 
     command <<<
         set -x
+
+        ls -l /cromwell_root/ > input_files_list.txt
 
         guppy_basecaller \
             -r \
@@ -147,31 +89,34 @@ task Basecall {
         # Reorganize and rename the passing filter data to include the barcode in the filename
         mkdir pass
         find guppy_output/ -name '*fastq*' -not -path '*fail*' -type f | \
-            awk -F"/" '{ a=NF-1; a=$a; b=$NF; gsub(/pass/, "unclassified", a); c=$NF; for (i = NF-1; i > 0; i--) { c=$i"/"c }; system("mv " c " pass/" a ".chunk_~{index}." b); }'
+            awk -F"/" '{ a=NF-1; a=$a; b=$NF; gsub(/pass/, "unclassified", a); c=$NF; for (i = NF-1; i > 0; i--) { c=$i"/"c }; system("mv " c " pass/" a "." b); }'
 
         # Reorganize and rename the failing filter data to include the barcode in the filename
         mkdir fail
         find guppy_output/ -name '*fastq*' -not -path '*pass*' -type f | \
-            awk -F"/" '{ a=NF-1; a=$a; b=$NF; gsub(/pass/, "unclassified", a); c=$NF; for (i = NF-1; i > 0; i--) { c=$i"/"c }; system("mv " c " fail/" a ".chunk_~{index}." b); }'
+            awk -F"/" '{ a=NF-1; a=$a; b=$NF; gsub(/pass/, "unclassified", a); c=$NF; for (i = NF-1; i > 0; i--) { c=$i"/"c }; system("mv " c " fail/" a "." b); }'
 
         # Count passing and failing files
         find pass -name '*fastq.gz' | wc -l | tee num_pass.txt
         find fail -name '*fastq.gz' | wc -l | tee num_fail.txt
 
-        # Extract relevant metadata (e.g. sample id, run id, etc.) from the first fastq file
-        # find pass -name '*fastq.gz' -type f | \
-        #     head -1 | \
-        #     xargs -n1 zgrep -m1 '^@' | \
-        #     sed 's/ /\n/g' | \
-        #     grep -v '^@' | \
-        #     sed 's/=/\t/g' | tee metadata.txt
+        # run barcoder 
+        guppy_barcoder \
+            --recursive \
+            --input_path guppy_output \
+            --save_path guppy_barcode_output \
+            ~{barcode_arg} \
+            --device "cuda:all"
     >>>
 
     output {
+        File input_files_list = "input_files_list.txt"
         Array[File] pass_fastqs = glob("pass/*.fastq.gz")
         File sequencing_summary = "guppy_output/sequencing_summary.txt"
         Array[String] barcodes = read_lines("barcodes.txt")
-        # Map[String, String] metadata = read_map("metadata.txt")
+
+        Directory guppy_barcode_output = "guppy_barcode_output"
+
         Int num_pass_fastqs = read_int("num_pass.txt")
         Int num_fail_fastqs = read_int("num_fail.txt")
     }
@@ -224,60 +169,6 @@ task MakeSequencingSummary {
 
     output {
         File sequencing_summary = "sequencing_summary.txt"
-    }
-
-    #########################
-    RuntimeAttr default_attr = object {
-        cpu_cores:          1,
-        mem_gb:             1,
-        disk_gb:            disk_size,
-        boot_disk_gb:       10,
-        preemptible_tries:  0,
-        max_retries:        0,
-        docker:             "us.gcr.io/broad-dsp-lrma/lr-utils:0.1.8"
-    }
-    RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
-    runtime {
-        cpu:                    select_first([runtime_attr.cpu_cores,         default_attr.cpu_cores])
-        memory:                 select_first([runtime_attr.mem_gb,            default_attr.mem_gb]) + " GiB"
-        disks: "local-disk " +  select_first([runtime_attr.disk_gb,           default_attr.disk_gb]) + " HDD"
-        bootDiskSizeGb:         select_first([runtime_attr.boot_disk_gb,      default_attr.boot_disk_gb])
-        preemptible:            select_first([runtime_attr.preemptible_tries, default_attr.preemptible_tries])
-        maxRetries:             select_first([runtime_attr.max_retries,       default_attr.max_retries])
-        docker:                 select_first([runtime_attr.docker,            default_attr.docker])
-    }
-}
-
-task MakeFinalSummary {
-    input {
-        String instrument
-        String sample_id
-        String flow_cell_id
-        String protocol_run_id
-        String started = "fakeStart"
-        String stopped = "fakeStop"
-
-        RuntimeAttr? runtime_attr_override
-    }
-
-    Int disk_size = 1
-
-    command <<<
-        set -euxo pipefail
-
-        echo 'instrument=~{instrument}' > final_summary.txt
-        echo 'flow_cell_id=~{flow_cell_id}' >> final_summary.txt
-        echo 'sample_id=~{sample_id}' >> final_summary.txt
-        echo 'protocol_run_id=~{protocol_run_id}' >> final_summary.txt
-        echo 'started=~{started}' >> final_summary.txt
-        echo 'acquisition_stopped=~{stopped}' >> final_summary.txt
-        echo 'processing_stopped=~{stopped}' >> final_summary.txt
-        echo 'basecalling_enabled=1' >> final_summary.txt
-        echo 'sequencing_summary_file=sequencing_summary.txt' >> final_summary.txt
-    >>>
-
-    output {
-        File final_summary = "final_summary.txt"
     }
 
     #########################
